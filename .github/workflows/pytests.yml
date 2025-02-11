@@ -156,7 +156,6 @@ jobs:
           task: get-measurement
           label: 'pytest core-pinned'
         continue-on-error: true
-up
 
       - name: Dump ECO-CI CPU Step before
         run: |
