@@ -2,12 +2,11 @@ name: CI tests
 # CI tests ran every time new code is pushed to the repo
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches-ignore:
-      - 'dependabot*'
+  schedule:
+    - cron: "10 * * * *" # every hour at 10 minutes
+  workflow_dispatch: # allows you to trigger the workflow run manually
+
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,29 +15,12 @@ permissions:
   contents: read
 
 jobs:
-  detect-ci-skip:
-    name: detect ci skip
-    runs-on: ubuntu-latest
-    if: |
-      github.repository == 'euroargodev/argopy'
-      && (github.event_name == 'push' || github.event_name == 'pull_request')
-    outputs:
-      skipped: ${{ steps.detect-skip.outputs.trigger-found }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - uses: xarray-contrib/ci-trigger@v1.2
-        id: detect-skip
-        with:
-          keyword: "[skip-ci]"
 
   core-pinned:
     # CI tests for environments with core requirements in pinned versions
     # All commits must pass this
 
     name: Core - Pinned - Py${{matrix.python-version}} - ${{ matrix.os }}
-    needs: detect-ci-skip
     runs-on: ${{ matrix.os }}
     if: needs.detect-ci-skip.outputs.skipped == 'false'
     defaults:
@@ -51,26 +33,39 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11"]
-        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        os: ["ubuntu-latest"]
         experimental: [false]
 
     steps:
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
       - name: Energy Estimation - Initialize
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4
         with:
           task: start-measurement
-          project: ${{ secrets.CARBONDB_PROJECT_UUID }}
-          tags: "${{github.workflow}},core-pinned,OS-${{matrix.os}},Company-${{ secrets.CARBONDB_COMPANY_UUID }},Py-${{matrix.python-version}}"
-          electricitymaps-api-token: ${{ secrets.ELECTRICITY_MAPS_TOKEN }}
+          tags: "${{github.workflow}},core-pinned,OS-${{matrix.os}},Company-,Py-${{matrix.python-version}}"
+          electricitymaps-api-token: ${{ secrets.ELECTRICITYMAPS_TOKEN }}
           send-data: true
         continue-on-error: true
       - uses: actions/checkout@v4
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.3
-        with:
-          aws-region: us-west-1
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ga-ci-tests-argopy-01
       - name: Set environment variables
         run: |
           echo "CONDA_ENV_FILE=ci/requirements/py${{matrix.python-version}}-core-pinned.yml" >> $GITHUB_ENV
@@ -98,6 +93,26 @@ jobs:
           micromamba info
           micromamba list
 
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
       - name: Energy Estimation - Measure Tests Setup
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
@@ -114,6 +129,26 @@ jobs:
         run: |
           pytest -ra -v -s -c argopy/tests/pytest.ini --durations=10 --cov=./ --cov-config=.coveragerc --cov-report xml:cov.xml --cov-report term-missing --log-file=${{env.LOG_FILE}} --junitxml=junit.xml -o junit_family=legacy
 
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
       - name: Energy Estimation - Measure Tests Exec
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
@@ -121,26 +156,28 @@ jobs:
           task: get-measurement
           label: 'pytest core-pinned'
         continue-on-error: true
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.3.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./cov.xml
-          flags: unittests, core, pinned, py${{matrix.python-version}}
-          name: codecov-github
-          fail_ci_if_error: false
-          env_vars: RUNNER_OS,PYTHON_VERSION
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-      - name: Save tests log as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Argopy-Tests-Core-${{matrix.python-version}}-${{matrix.os}}
-          path: ${{env.LOG_FILE}}
-          retention-days: 90
+up
+
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
       - name: Energy Estimation - Show Results
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
@@ -166,26 +203,41 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11"]
-        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        os: ["ubuntu-latest"]
         experimental: [false]
 
     steps:
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
+
       - name: Energy Estimation - Initialize
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
         with:
           task: start-measurement
-          project: ${{ secrets.CARBONDB_PROJECT_UUID }}
-          tags: "${{github.workflow}},all-pinned,OS-${{matrix.os}},Company-${{ secrets.CARBONDB_COMPANY_UUID }},Py-${{matrix.python-version}}"
-          electricitymaps-api-token: ${{ secrets.ELECTRICITY_MAPS_TOKEN }}
+          tags: "${{github.workflow}},all-pinned,OS-${{matrix.os}},Company-,Py-${{matrix.python-version}}"
+          electricitymaps-api-token: ${{ secrets.ELECTRICITYMAPS_TOKEN }}
           send-data: true
         continue-on-error: true
       - uses: actions/checkout@v4
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.3
-        with:
-          aws-region: us-west-1
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ga-ci-tests-argopy-01
       - name: Set environment variables
         run: |
           echo "CONDA_ENV_FILE=ci/requirements/py${{matrix.python-version}}-all-pinned.yml" >> $GITHUB_ENV
@@ -213,6 +265,28 @@ jobs:
           micromamba info
           micromamba list
 
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
+
       - name: Energy Estimation - Measure Tests Setup
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
@@ -229,6 +303,28 @@ jobs:
         run: |
           pytest -ra -v -s -c argopy/tests/pytest.ini --durations=10 --cov=./ --cov-config=.coveragerc --cov-report xml:cov.xml --cov-report term-missing --log-file=${{env.LOG_FILE}} --junitxml=junit.xml -o junit_family=legacy
 
+
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
       - name: Energy Estimation - Measure Tests Exec
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
@@ -236,26 +332,48 @@ jobs:
           task: get-measurement
           label: 'pytest all-pinned'
         continue-on-error: true
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.3.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./cov.xml
-          flags: unittests, all, pinned, py${{matrix.python-version}}
-          name: codecov-github
-          fail_ci_if_error: false
-          env_vars: RUNNER_OS,PYTHON_VERSION
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-      - name: Upload tests log to GA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Argopy-Tests-All-${{matrix.python-version}}-${{matrix.os}}
-          path: ${{env.LOG_FILE}}
-          retention-days: 90
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v5.3.1
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     files: ./cov.xml
+      #     flags: unittests, all, pinned, py${{matrix.python-version}}
+      #     name: codecov-github
+      #     fail_ci_if_error: false
+      #     env_vars: RUNNER_OS,PYTHON_VERSION
+      # - name: Upload test results to Codecov
+      #   if: ${{ !cancelled() }}
+      #   uses: codecov/test-results-action@v1
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      # - name: Upload tests log to GA
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Argopy-Tests-All-${{matrix.python-version}}-${{matrix.os}}
+      #     path: ${{env.LOG_FILE}}
+      #     retention-days: 90
+
+      - name: Dump ECO-CI CPU Step before
+        run: |
+          cat /tmp/eco-ci/cpu-util-step.txt
+        continue-on-error: true
+
+
+      - name: Dump ECO-CI CPU before
+        run: |
+          cat /tmp/eco-ci/cpu-util-total.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI CPU Step actual processed
+        run: |
+          cat /tmp/eco-ci/cpu-util-temp.txt
+        continue-on-error: true
+
+      - name: Dump ECO-CI Energy Step actual processed
+        run: |
+          cat /tmp/eco-ci/energy-step.txt
+        continue-on-error: true
+
       - name: Energy Estimation - Show Results
         if: ${{matrix.os == 'ubuntu-latest'}}
         uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
