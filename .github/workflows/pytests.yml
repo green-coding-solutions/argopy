@@ -57,7 +57,7 @@ jobs:
         continue-on-error: true
       - name: Energy Estimation - Initialize
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: start-measurement
           tags: "${{github.workflow}},core-pinned,OS-${{matrix.os}},Company-,Py-${{matrix.python-version}}"
@@ -114,7 +114,7 @@ jobs:
 
       - name: Energy Estimation - Measure Tests Setup
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: get-measurement
           label: 'setup core-pinned'
@@ -150,7 +150,7 @@ jobs:
 
       - name: Energy Estimation - Measure Tests Exec
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: get-measurement
           label: 'pytest core-pinned'
@@ -178,7 +178,7 @@ jobs:
 
       - name: Energy Estimation - Show Results
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: display-results
         continue-on-error: true
@@ -226,7 +226,7 @@ jobs:
 
       - name: Energy Estimation - Initialize
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: start-measurement
           tags: "${{github.workflow}},all-pinned,OS-${{matrix.os}},Company-,Py-${{matrix.python-version}}"
@@ -285,7 +285,7 @@ jobs:
 
       - name: Energy Estimation - Measure Tests Setup
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: get-measurement
           label: 'setup all-pinned'
@@ -323,7 +323,7 @@ jobs:
 
       - name: Energy Estimation - Measure Tests Exec
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: get-measurement
           label: 'pytest all-pinned'
@@ -372,7 +372,7 @@ jobs:
 
       - name: Energy Estimation - Show Results
         if: ${{matrix.os == 'ubuntu-latest'}}
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4.4
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4debug
         with:
           task: display-results
         continue-on-error: true
